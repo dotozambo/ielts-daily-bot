@@ -20,24 +20,32 @@ pg_cron (07:00 KST) ──▶ ielts-daily ──▶ chat.postMessage ──▶ �
 | `scripts/data.py`, `scripts/gen_seed.py` | 학습표 원본 데이터 → 시드 SQL 생성 |
 | `slack-app-manifest.json` | 슬랙 앱 생성용 매니페스트 |
 
-## 설정 순서
+## 현재 상태
 
-1. **슬랙 앱 만들기**: api.slack.com/apps → Create New App → From an app manifest →
-   `slack-app-manifest.json` 붙여넣기 (`imzxbyjsxxfotgpuquuj`는 Supabase 프로젝트 ref로 바꾸기)
-   → 워크스페이스에 설치 → `Bot User OAuth Token`(xoxb-…)과 `Signing Secret` 확인
-2. 봇을 받을 채널에 초대: 채널에서 `/invite @ielts-bot`, 채널 ID 복사(채널 정보 하단)
-3. **Edge Function 시크릿** (대시보드 → Edge Functions → Secrets):
-   `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `SLACK_CHANNEL_ID`, `IELTS_CRON_SECRET`(아무 긴 랜덤 문자열)
-4. 마이그레이션 1·2 실행, 함수 배포
-   (`ielts-daily`, `ielts-slack-actions` 모두 `--no-verify-jwt`: 각자 시크릿/서명으로 인증)
-5. Vault에 `ielts_project_url`, `ielts_cron_secret` 넣고 마이그레이션 3 실행
+- Supabase 프로젝트 `ielts-daily-bot` (`imzxbyjsxxfotgpuquuj`, 서울): 테이블·40일 데이터·함수 2개·cron(매일 07:00 KST) 적용 완료
+- cron 인증 시크릿은 Vault(`ielts_cron_secret`)에 랜덤 생성되어 있고, 함수가 DB 함수 `ielts_check_cron_secret`으로 검증한다
+  (Edge Function 시크릿에 따로 넣을 필요 없음)
+
+## 남은 설정 (슬랙)
+
+1. api.slack.com/apps → Create New App → From an app manifest → `slack-app-manifest.json` 붙여넣기 → 워크스페이스에 설치
+2. `OAuth & Permissions`의 Bot User OAuth Token(`xoxb-…`), `Basic Information`의 Signing Secret 확인
+3. 봇을 받을 채널에서 `/invite @ielts-bot`, 채널 ID 복사 (채널 이름 클릭 → 맨 아래)
+4. Supabase 대시보드 → Edge Functions → Secrets에 `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `SLACK_CHANNEL_ID` 입력
 
 ## 수동 테스트
 
-```bash
-curl -X POST "https://imzxbyjsxxfotgpuquuj.supabase.co/functions/v1/ielts-daily?day=2026-11-24" \
-  -H "x-cron-secret: $IELTS_CRON_SECRET"
-# 이미 보낸 날을 다시 보내려면 &force=1
+SQL Editor에서 (특정 날짜 메시지를 바로 보내 보기, 이미 보낸 날은 `&force=1`):
+
+```sql
+select net.http_post(
+  url := 'https://imzxbyjsxxfotgpuquuj.supabase.co/functions/v1/ielts-daily?day=2026-11-24',
+  headers := jsonb_build_object('x-cron-secret',
+    (select decrypted_secret from vault.decrypted_secrets where name = 'ielts_cron_secret')),
+  body := '{}'::jsonb
+);
+-- 결과 확인
+select status_code, content from net._http_response order by id desc limit 1;
 ```
 
 ## 학습표 고치기

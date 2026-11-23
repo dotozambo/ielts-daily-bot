@@ -1,13 +1,17 @@
 // 매일 아침 pg_cron이 호출 → 오늘 행을 슬랙 채널에 보낸다.
-// 수동 테스트: POST ?day=2026-11-25 (x-cron-secret 헤더 필요)
+// 인증: x-cron-secret 헤더를 Vault의 ielts_cron_secret과 비교 (DB 함수 ielts_check_cron_secret)
+// 수동 테스트: SQL Editor에서 README의 "수동 테스트" 쿼리 실행
 import { db, getDay, getProgress, getReview, todayInSeoul } from "../_shared/db.ts";
 import { renderDaily } from "../_shared/render.ts";
 import { slackApi } from "../_shared/slack.ts";
 
 Deno.serve(async (req) => {
-  if (req.headers.get("x-cron-secret") !== Deno.env.get("IELTS_CRON_SECRET")) {
-    return new Response("unauthorized", { status: 401 });
-  }
+  const secret = req.headers.get("x-cron-secret");
+  const { data: authorized, error: authError } = secret
+    ? await db.rpc("ielts_check_cron_secret", { p_secret: secret })
+    : { data: false, error: null };
+  if (authError) throw authError;
+  if (!authorized) return new Response("unauthorized", { status: 401 });
 
   const url = new URL(req.url);
   const day = url.searchParams.get("day") ?? todayInSeoul();
