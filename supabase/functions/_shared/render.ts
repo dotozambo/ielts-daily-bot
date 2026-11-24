@@ -1,6 +1,7 @@
 // 슬랙 Block Kit 메시지 만들기 (DB/네트워크 의존 없음 → 테스트 쉬움)
 
 export type Expression = { en: string; ko: string };
+export type Todo = { kind: "blog" | "listening" | "reading" | "mock"; text: string; url: string; minutes: number };
 export type Day = {
   day: string; // YYYY-MM-DD
   week: number;
@@ -14,6 +15,7 @@ export type Day = {
   review_label: string | null;
   review_dates: string[];
   done: boolean;
+  todos?: Todo[] | null;
 };
 export type ReviewItem = { day: string; expressions: Expression[] };
 export type Progress = { done: number; total: number; examDate: string };
@@ -34,6 +36,14 @@ export function daysBetween(from: string, to: string): number {
 }
 
 const section = (text: string) => ({ type: "section", text: { type: "mrkdwn", text } });
+const TODO_ICON: Record<Todo["kind"], string> = { blog: "🔗 블로그", listening: "🎧 Listening", reading: "📖 Reading", mock: "📝 모의시험" };
+const escMd = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+export function renderTodos(todos: Todo[]): string {
+  const total = todos.reduce((n, t) => n + t.minutes, 0);
+  const lines = todos.map((t) => `• *${TODO_ICON[t.kind]}* (${t.minutes}분) ${escMd(t.text)}  <${t.url}|열기>`);
+  return `📌 *오늘 할 일* · 약 ${total}분\n${lines.join("\n")}`;
+}
 const context = (text: string) => ({ type: "context", elements: [{ type: "mrkdwn", text }] });
 const divider = { type: "divider" };
 
@@ -64,8 +74,10 @@ export function renderDaily(d: Day, review: ReviewItem[], p: Progress) {
   if (d.frame) blocks.push(section(`✍️ *문장 틀*\n\`${d.frame}\``));
 
   if (d.mission) {
-    blocks.push(section(`🎯 *미션*\n${d.mission}\n_→ 이 메시지 스레드에 답장으로 남기기_`));
+    blocks.push(section(`🎯 *미션*\n${d.mission}\n_→ 이 메시지 스레드에 답장으로 남기기 · 📒 정리 노트는 스레드에_`));
   }
+
+  if (d.todos?.length) blocks.push(section(renderTodos(d.todos)));
 
   const reviewExprs = review.flatMap((r) => r.expressions);
   if (reviewExprs.length) {

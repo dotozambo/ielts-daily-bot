@@ -7,12 +7,14 @@ from notes_w3 import W3
 from notes_w4 import W4
 from notes_w5 import W5
 from extras import EXTRAS
+from todos import TODOS
 from data import rows
 
 START = date(2026, 11, 24)
 NOTES = {**W1, **W2, **W3, **W4, **W5}
 days = [(START + timedelta(days=i)).isoformat() for i in range(len(rows))]
 
+assert set(TODOS) <= set(days), "할 일 날짜가 학습 기간 밖"
 missing = [d for d in days if d not in NOTES]
 assert not missing, f"노트 없는 날: {missing}"
 
@@ -34,9 +36,10 @@ out, stmts = [], []
 for d in days:
     n = NOTES[d]
     note = {"summary": n["summary"], "items": n["items"], "frame_tip": n.get("frame_tip"), "extra": n.get("extra")}
-    rec = {"day": d, "note": note, "quiz": n.get("quiz"), "model": n.get("model"), "extras": EXTRAS.get(d)}
+    rec = {"day": d, "note": note, "quiz": n.get("quiz"), "model": n.get("model"), "extras": EXTRAS.get(d),
+           "todos": TODOS.get(d)}
     out.append(rec)
-    stmts.append(f"update public.ielts_days set note = {q(note)}, quiz = {q(rec['quiz'])}, model = {q(rec['model'])}, extras = {q(rec['extras'])} where day = '{d}';")
+    stmts.append(f"update public.ielts_days set note = {q(note)}, quiz = {q(rec['quiz'])}, model = {q(rec['model'])}, extras = {q(rec['extras'])}, todos = {q(rec['todos'])} where day = '{d}';")
 
 open("../supabase/migrations/20261124000002_seed_notes.sql", "w").write(
     "-- 정리 노트·퀴즈·모범 답안·추가 표현 (scripts/gen_notes.py로 생성)\n" + "\n".join(stmts) + "\n")

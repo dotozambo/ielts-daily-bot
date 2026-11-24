@@ -54,3 +54,18 @@ Deno.test("정답은 버튼 누르기 전엔 안 보임 / & 이스케이프", ()
   const crime = renderNote({ summary: "a & b", items: [], frame_tip: null, extra: null }, { frame: null, lessonTitle: "Crime & Punishment", lessonUrl: "https://x.com" });
   assert(JSON.stringify(crime).includes("Crime &amp; Punishment"));
 });
+
+import { renderDaily, renderTodos } from "../supabase/functions/_shared/render.ts";
+Deno.test("오늘 할 일: 메인 메시지에 들어가고 링크 형식이 맞음", () => {
+  for (const n of notes) {
+    const row = { ...(dayRow.get(n.day) as any), todos: n.todos };
+    const m = renderDaily(row, [], { done: 0, total: 40, examDate: "2027-01-03" });
+    const json = JSON.stringify(m.blocks);
+    if (n.todos?.length) {
+      assert(json.includes("오늘 할 일"), n.day);
+      for (const t of n.todos) assert(json.includes(`<${t.url}|열기>`), `${n.day} 링크`);
+    } else assert(!json.includes("오늘 할 일"), n.day);
+    checkMsg(`${n.day} main`, m);
+  }
+  assert(renderTodos([{ kind: "blog", text: "a & b", url: "https://x.y", minutes: 10 }]).includes("a &amp; b"));
+});
