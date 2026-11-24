@@ -1,6 +1,8 @@
 # IELTS 일일 학습봇
 
 매일 아침 7시(KST)에 슬랙 채널로 그날의 IELTS 표현·문장 틀·미션·복습을 보내는 봇.
+메인 메시지 스레드에 📒 정리 노트(쓰임·예문·실수·발음) → 🌱 추가 표현(구문 5 + 단어 5) → 🧩 퀴즈가 달리고,
+✅ 완료를 누르면 모범 답안이 스레드에 올라온다.
 학습표 데이터는 Supabase `ielts_days` 테이블에 있고, 서버는 Supabase Edge Functions 두 개뿐이다.
 
 ```
@@ -47,6 +49,19 @@ select net.http_post(
 -- 결과 확인
 select status_code, content from net._http_response order by id desc limit 1;
 ```
+
+## 정리 노트 데이터
+
+| 경로 | 내용 |
+|---|---|
+| `scripts/notes_w1.py` ~ `notes_w5.py` | 날짜별 정리 노트·퀴즈·모범 답안 |
+| `scripts/extras.py` | 날짜별 추가 구문 5 + 단어 5 |
+| `scripts/gen_notes.py` | 위 데이터 검증 후 `data/notes.json` + 업데이트 SQL 생성 |
+
+고친 뒤 `cd scripts && python3 gen_notes.py` → 커밋·푸시 → SQL Editor에서 GitHub의 `data/notes.json`을
+`net.http_get`으로 받아 `ielts_days`의 note·quiz·model·extras를 갱신한다 (커밋 SHA로 고정, md5 확인).
+
+이미 보낸 날짜에 스레드만 다시 달기: `ielts-daily?day=YYYY-MM-DD&thread_only=1`
 
 ## 학습표 고치기
 
